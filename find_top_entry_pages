@@ -1,0 +1,13 @@
+CREATE TEMPORARY TABLE first_pageview
+SELECT website_session_id,
+		MIN(website_pageview_id) AS min_pv_id
+FROM mavenfuzzyfactory.website_pageviews
+GROUP BY 1 ;
+
+SELECT wp.pageview_url AS landing_page,
+	   COUNT(DISTINCT(fp.website_session_id)) AS sessions_hitting_this_lander
+FROM first_pageview fp
+LEFT JOIN website_pageviews wp ON fp.min_pv_id = wp.website_pageview_id
+WHERE wp.created_at <'2012-06-12'
+GROUP BY 1
+ORDER BY 2 DESC
