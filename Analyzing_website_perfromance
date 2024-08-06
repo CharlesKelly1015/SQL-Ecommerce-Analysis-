@@ -1,3 +1,6 @@
+
+
+
 CREATE TEMPORARY TABLE first_pageview
 SELECT website_session_id,
 		MIN(website_pageview_id) AS min_pv_id
