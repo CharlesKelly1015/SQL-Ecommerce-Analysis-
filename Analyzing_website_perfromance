@@ -54,36 +54,37 @@ SELECT pageview_url,
 		MIN(created_at) AS first_created_at,
 		MIN(website_pageview_id) AS first_pageview_id 
 FROM website_pageviews 
-WHERE pageview_url = '/lander-1'
+WHERE pageview_url = '/lander-1' AND created_at IS NOT NULL
 GROUP BY 1;
-CREATE temporary TABLE numoo_sessions
+# 2012-06-19 00:35:54.   23504
+CREATE TEMPORARY TABLE first_test_pageviews 
 SELECT wp.website_session_id,
-		wp.pageview_url
+		MIN(wp.website_pageview_id) AS min_pageview_id
 FROM website_pageviews wp
-INNER JOIN website_sessions ws USING(website_session_id)
-WHERE wp.pageview_url = '/home' OR wp.pageview_url = '/lander-1' AND wp.created_at< '2012-07-28'
-	  AND wp.website_pageview_id>23504
-      AND ws.utm_source='gsearch'
-      AND ws.utm_campaign='nonbrand';
-	
-# bunced sessions 
-CREATE temporary TABLE bounceddd_sessions
-SELECT ns.website_session_id,
-       ns.pageview_url,
-		COUNT(wp.website_pageview_id) 
-FROM numoo_sessions ns 
-LEFT JOIN website_pageviews wp USING (website_session_id)
-GROUP BY 1,2
-HAVING COUNT(wp.website_pageview_id) =1 ;
+INNER JOIN website_sessions ws USING(website_session_id) 
+WHERE ws.created_at<'2012-07-28' AND wp.website_pageview_id >23504
+		AND utm_source ='gsearch' AND utm_campaign ='nonbrand'
+GROUP BY 1;
 
-# get bounce rate 
-SELECT pageview_url AS landing_page,
-	   COUNT(DISTINCT(sessions)) AS total_sessions,
-       COUNT(DISTINCT(bounced_sessions)) AS bounced_sessions,
-       ROUND(COUNT(DISTINCT(bounced_sessions))/COUNT(DISTINCT(sessions))*100,2) AS bounce_rate
-FROM (SELECT  ns.pageview_url,
-		ns.website_session_id AS sessions,
-		bs.website_session_id AS bounced_sessions
-FROM numoo_sessions ns 
-LEFT JOIN bounceddd_sessions bs USING (website_session_id)) t1 
-GROUP BY 1
+CREATE TEMPORARY TABLE nonbrand_test_sessions_w_landing_page 
+SELECT fp.website_session_id,
+		wp.pageview_url AS landing_page
+FROM first_test_pageviews fp
+LEFT JOIN website_pageviews wp ON fp.min_pageview_id = wp.website_pageview_id
+WHERE wp.pageview_url = '/home' OR wp.pageview_url = '/lander-1';
+
+CREATE TEMPORARY TABLE bounced_sessions  
+SELECT nb.website_session_id,
+		COUNT(distinct(wp.website_pageview_id)) AS bounce 
+FROM nonbrand_test_sessions_w_landing_page nb
+LEFT JOIN website_pageviews wp USING(website_session_id)
+GROUP BY 1 
+HAVING COUNT(distinct(wp.website_pageview_id)) =1;
+
+SELECT nb.landing_page,
+		COUNT(nb.website_session_id) AS sessions,
+		COUNT(bs.website_session_id) AS bounced_sessions,
+        ROUND(COUNT(bs.website_session_id)/COUNT(nb.website_session_id)*100,2) AS bounce_rate
+FROM nonbrand_test_sessions_w_landing_page nb 
+LEFT JOIN bounced_sessions bs USING(website_session_id)
+GROUP BY 1 
